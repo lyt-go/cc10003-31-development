@@ -3,10 +3,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.fchandoff import REJECT_UNDEPLOYED, handoff_service
 from app.store import store
 
 MODULE = "analysis"
 REQUIRED_FIELDS = ["方案编号", "分析主题", "数据集范围"]
+OPTIONAL_FIELDS = ["分析方法", "对比基准", "显著性阈值", "输出图表类型", "调度周期", "引用预测方案"]
 STATUS_ORDER = ["草稿", "方案评审中", "已启用", "已归档"]
 ACTION_RULES = {"提交方案评审": "方案评审中", "启用方案": "已启用", "归档方案": "已归档"}
 NEGATIVE_ACTIONS = []
@@ -40,6 +42,7 @@ class AnalysisService:
         rows = store.rows(MODULE)
         entry = {"id": max((int(row.get("id", 0)) for row in rows), default=0) + 1}
         entry.update({field: values.get(field) for field in REQUIRED_FIELDS})
+        entry.update({field: values.get(field) for field in OPTIONAL_FIELDS if values.get(field) is not None})
         entry["status"] = STATUS_ORDER[0]
         entry["pending"] = True
         entry["abnormal"] = False
@@ -55,6 +58,17 @@ class AnalysisService:
         target = ACTION_RULES[action]
         if target not in STATUS_ORDER:
             return None, f"目标状态「{target}」不在允许的状态序列里"
+        if action == "启用方案":
+            if entry.get("status") == "已启用":
+                return entry, "分析方案已启用，重复启用只生效一次"
+            plan_code = str(entry.get("引用预测方案") or "").strip()
+            if plan_code:
+                # 分析方案只能引用已部署模型，绑定当前部署的交接信封
+                envelope = handoff_service.deployed_for_plan(plan_code)
+                if envelope is None:
+                    return None, f"预测方案 {plan_code} 没有已部署模型，分析方案只能引用已部署模型（{REJECT_UNDEPLOYED}）"
+                entry["绑定交接信封"] = envelope["envelope_id"]
+                entry["绑定模型版本"] = envelope["model_version"]
         entry["status"] = target
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS

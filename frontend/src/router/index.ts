@@ -16,6 +16,7 @@ const Reportsch = () => import('@/views/reportsch/index.vue')
 const Dimprop = () => import('@/views/dimprop/index.vue')
 const Datadrill = () => import('@/views/datadrill/index.vue')
 const Forecast = () => import('@/views/forecast/index.vue')
+const Fchandoff = () => import('@/views/fchandoff/index.vue')
 const Tagmgr = () => import('@/views/tagmgr/index.vue')
 const Insight = () => import('@/views/insight/index.vue')
 const Dataval = () => import('@/views/dataval/index.vue')
@@ -39,6 +40,7 @@ const router = createRouter({
     { path: '/dimprop', name: 'dimprop', component: Dimprop },
     { path: '/datadrill', name: 'datadrill', component: Datadrill },
     { path: '/forecast', name: 'forecast', component: Forecast },
+    { path: '/fchandoff', name: 'fchandoff', component: Fchandoff },
     { path: '/tagmgr', name: 'tagmgr', component: Tagmgr },
     { path: '/insight', name: 'insight', component: Insight },
     { path: '/dataval', name: 'dataval', component: Dataval },

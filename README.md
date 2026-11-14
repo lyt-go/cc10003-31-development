@@ -64,6 +64,7 @@ npm run dev
 | 维度属性 | `dimprop` | 维度属性 | 属性编号、维度名称、属性名称 |
 | 多维下钻 | `datadrill` | 下钻路径 | 路径编号、起始维度、下钻层级 |
 | 预测模型 | `forecast` | 预测方案 | 方案编号、预测目标、算法名称 |
+| 预测交接 | `fchandoff` | 交接信封 | 信封编号、预测目标、模型版本 |
 | 标签管理 | `tagmgr` | 标签定义 | 标签编号、标签名称、标签分类 |
 | 洞察推送 | `insight` | 洞察报告 | 报告编号、报告标题、分析主题 |
 | 数据验证 | `dataval` | 验证任务 | 任务编号、验证数据集、验证类型 |
@@ -74,6 +75,29 @@ npm run dev
   `backend/app/routers/<模块>.py`，业务规则在 `backend/app/services/<模块>.py`。
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
+
+## 预测到分析的版本链（fchandoff）
+
+预测口径进入分析输出的版本边界如下：
+
+- **部署固化**：预测方案「部署模型」时把预测窗口、特征字段、模型版本、置信水平固化成
+  交接信封（`fc_envelope`），口径不全拒绝建版；同一预测目标+窗口的当前部署唯一，
+  重复部署同一版本只生效一次，部署新版本时旧版本转 `superseded` 并保留。
+- **分析消费**：分析方案只能引用 `deployed` 状态的信封，引用未部署模型返回
+  `UNDEPLOYED_MODEL_31`（徽标 `NOT_ALLOWED_31`）；「启用方案」与生成输出都幂等，
+  重复启用只生效一次。输出（`fc_output`）记录预测结果、置信水平、对比基线，
+  可按 `envelope_id` 回溯模型版本、窗口与样本范围。
+- **重训换版**：重训成功生成新版本信封；训练失败或窗口不完整时不建新版，
+  只把当前版的输出标记为受影响，不覆盖上一版数值。
+- **审计**：`deploy`、`supersede`、`reject` 三类事件全部落 `fc_audit`。
+- **文件流转**：`GET /api/fchandoff/export` 打包信封、输出与审计下载；
+  `POST /api/fchandoff/reload` 重新载入时模型版本与样本范围原样保留，已存在记录跳过。
+
+示例数据：`FORE-GMV_DAILY`（14 天窗口、7 天训练周期、置信水平 0.95）部署为
+`model-v8`（信封 `analysis_handoff_v8`），`ANAL-GMV_TREND` 消费该模型，
+2026-10-15 回测输出预测中值 1284000、对比基线 1198000、徽标 `DEPLOYED_V8`。
+
+验收测试：`cd backend && .venv/bin/python -m unittest tests.test_fchandoff -v`
 
 领域：数据工程
 子方向：数据分析与数据应用
